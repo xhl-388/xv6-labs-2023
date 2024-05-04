@@ -1,0 +1,6 @@
+usertrap
+7   represents trapnum
+user mode
+B+> 0x80002052 <syscall+20> lw      a3,0(zero) # 0x0  ,a3 corresponds to num
+because 0 VA is not mapped in kernel space , yes, scause is 13, means "load page fault"
+name:initcode pid:1
