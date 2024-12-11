@@ -74,8 +74,38 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  uint64 va;
+  int npages;
+  uint64 out;
+  unsigned int bitmask = 0;
+  struct proc *cproc = myproc();
+  pte_t *tmpPte = 0;
+
+  argaddr(0, &va);
+  argint(1, &npages);
+  argaddr(2, &out);
+
+  vmprint(cproc->pagetable);
+  pte_t* pte = walk(cproc->pagetable, va, 0);
+  if (0 == pte){
+    printf("try to get access bit from a invalid virtual address");
+    goto bad;
+  }
+  for(int i =0; i < npages && i < 32; i++){
+    tmpPte = &(pte[i]);
+    if((*tmpPte) & PTE_A){
+      bitmask |= (1 << i);
+      (*tmpPte) &= (~PTE_A);
+    }
+  }
+
+  copyout(cproc->pagetable, out, (char*)&bitmask, sizeof(bitmask));
   return 0;
+
+bad:
+  bitmask = 0;
+  copyout(cproc->pagetable, out, (char*)&bitmask, sizeof(bitmask));
+  return -1;
 }
 #endif
 
