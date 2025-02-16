@@ -99,8 +99,13 @@ struct proc {
   uint64 kstack;               // Virtual address of kernel stack
   uint64 sz;                   // Size of process memory (bytes)
   pagetable_t pagetable;       // User page table
+  uint64 sigFunc;              // The signal handler assigned by sigalarm syscall
+  int sigTicks;                // sigFunc is called every sigTicks ticks
+  int curTicks;                // current tick past since handler is assigned or last call of sigFunc
+  uint8 bOnSig;                // currently on a signal handler, ignore more timer interrupt
   struct trapframe *trapframe; // data page for trampoline.S
   struct context context;      // swtch() here to run process
+  struct trapframe *sigTF;    // backup registers interrupt by time signal handler
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)

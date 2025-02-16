@@ -66,7 +66,21 @@ usertrap(void)
 
     syscall();
   } else if((which_dev = devintr()) != 0){
-    // ok
+    // timer interrupt
+    if(which_dev == 2 && p->sigTicks && !p->bOnSig){
+      p->curTicks++;
+      if (p->curTicks >= p->sigTicks){
+        // reset tick
+        p->curTicks = 0;
+        p->bOnSig = 1;
+
+        // save context
+        memmove(p->sigTF, p->trapframe, sizeof(struct trapframe));
+
+        // return to userspace sigFunc
+        p->trapframe->epc = p->sigFunc;
+      }
+    }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
