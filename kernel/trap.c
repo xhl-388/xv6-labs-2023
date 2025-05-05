@@ -65,6 +65,20 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if (r_scause() == 15 || r_scause() == 13) {
+    // Store/AMO Page Fault Exception riscv-privileged 4.1.9
+
+    if(killed(p))
+      exit(-1);
+    
+    if (r_stval() < PGSIZE) {
+      setkilled(p);
+    }
+    else if (handle_pagefault(p->pagetable, r_stval()) < 0) {
+      // if error occurs, e.g. out of memory, kill the proc
+      setkilled(p);
+    }
+    
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {

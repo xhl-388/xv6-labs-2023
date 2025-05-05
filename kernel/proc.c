@@ -686,3 +686,47 @@ procdump(void)
     printf("\n");
   }
 }
+
+int
+handle_pagefault(pagetable_t pgtbl, uint64 va)
+{
+  pte_t *pte;
+  uint64 pa, mem;
+  int flags;
+
+  va = PGROUNDDOWN(va);
+
+  pte = walk(pgtbl, va, 0);
+  if ((*pte & PTE_RSW1) == 0 || (*pte & PTE_V) == 0) {
+    // read-only page or invalid page
+    return -1;
+  }
+
+  // recover flag
+  *pte ^= PTE_RSW1;
+  *pte |= PTE_W;
+
+  pa = PTE2PA(*pte);
+  if (get_pgref(pa) == 1) {
+    // last proc, just return
+    return 0;
+  }
+
+  mem = (uint64)kalloc();
+  if (0 == mem) {
+    return -1;
+  }
+  memmove((void*)mem, (void*)pa, PGSIZE);
+
+  // avoid remap panic
+  *pte ^= PTE_V;
+  flags = PTE_FLAGS(*pte);
+  if (mappages(pgtbl, va, PGSIZE, mem, flags) < 0) {
+    kfree((void*)mem);
+    return -1;
+  }
+
+  kfree((void*)pa);
+
+  return 0;
+}

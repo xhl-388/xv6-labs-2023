@@ -309,6 +309,7 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 // physical memory.
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
+/*
 int
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
@@ -331,6 +332,40 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       kfree(mem);
       goto err;
     }
+  }
+  return 0;
+
+ err:
+  uvmunmap(new, 0, i / PGSIZE, 1);
+  return -1;
+}
+*/
+
+int
+uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
+{
+  pte_t *pte;
+  uint64 pa, i;
+  int flags;
+
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walk(old, i, 0)) == 0)
+      panic("uvmcopy: pte should exist");
+    if((*pte & PTE_V) == 0)
+      panic("uvmcopy: page not present");
+    if (*pte & PTE_W) {
+      // add shared flag and remove PTE_W
+      *pte |= PTE_RSW1;
+      *pte ^= PTE_W;
+    }
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
+
+    if(mappages(new, i, PGSIZE, pa, flags) != 0){
+      panic("err");
+      goto err;
+    }
+    inc_pgref(pa);
   }
   return 0;
 
@@ -366,10 +401,18 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     if(va0 >= MAXVA)
       return -1;
     pte = walk(pagetable, va0, 0);
-    if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ||
-       (*pte & PTE_W) == 0)
+    if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0)
       return -1;
+    if ((*pte & PTE_W) == 0) {
+        if (handle_pagefault(pagetable, va0) < 0) {
+          return -1;
+        }
+    }
+
+    // re-get pte and pa
+    pte = walk(pagetable, va0, 0);
     pa0 = PTE2PA(*pte);
+
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
