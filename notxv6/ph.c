@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 
-#define NBUCKET 5
+#define NBUCKET 10
 #define NKEYS 100000
 
 struct entry {
@@ -14,6 +14,7 @@ struct entry {
   struct entry *next;
 };
 struct entry *table[NBUCKET];
+pthread_rwlock_t mutex[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
 
@@ -40,13 +41,14 @@ static
 void put(int key, int value)
 {
   int i = key % NBUCKET;
+  struct entry *e = 0;
 
   // is the key already present?
-  struct entry *e = 0;
   for (e = table[i]; e != 0; e = e->next) {
     if (e->key == key)
       break;
   }
+  pthread_rwlock_wrlock(&mutex[i]);
   if(e){
     // update the existing key.
     e->value = value;
@@ -54,7 +56,7 @@ void put(int key, int value)
     // the new is new.
     insert(key, value, &table[i], table[i]);
   }
-
+  pthread_rwlock_unlock(&mutex[i]);
 }
 
 static struct entry*
@@ -62,11 +64,12 @@ get(int key)
 {
   int i = key % NBUCKET;
 
-
+  pthread_rwlock_rdlock(&mutex[i]);
   struct entry *e = 0;
   for (e = table[i]; e != 0; e = e->next) {
     if (e->key == key) break;
   }
+  pthread_rwlock_unlock(&mutex[i]);
 
   return e;
 }
@@ -118,6 +121,11 @@ main(int argc, char *argv[])
     keys[i] = random();
   }
 
+  for (int i = 0; i < NBUCKET; i++)
+  {
+    pthread_rwlock_init(&mutex[i], NULL);
+  }
+
   //
   // first the puts
   //
@@ -147,4 +155,9 @@ main(int argc, char *argv[])
 
   printf("%d gets, %.3f seconds, %.0f gets/second\n",
          NKEYS*nthread, t1 - t0, (NKEYS*nthread) / (t1 - t0));
+
+  for (int i = 0; i < NBUCKET; i++)
+  {
+    pthread_rwlock_destroy(&mutex[i]);
+  }
 }

@@ -1,0 +1,6 @@
+Because threads are racing to access to hashtable.
+They may insert data to same bucket at the same time, so the head insert will be overrided, are some data may be lost (no pointer to this data).
+
+PS: the current solution is fast, but actually not safe in any situation
+Here is safe because the different thread always insert different key, so we can put the lock when actually inserting.
+If it's not the case, we have to put lock action before checking if the key exists
